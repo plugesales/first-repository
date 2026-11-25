@@ -34,7 +34,7 @@ export function IssueInvoicePage({
   const [addrNumber, setAddrNumber] = useState('');
   const [addrDistrict, setAddrDistrict] = useState('');
   const [addrCityCode, setAddrCityCode] = useState('');
-  const [serviceCode, setServiceCode] = useState('010701');
+  const [serviceCode, setServiceCode] = useState('170601');
   const [municipalTaxCode, setMunicipalTaxCode] = useState('');
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('1000.00');
@@ -89,7 +89,7 @@ export function IssueInvoicePage({
     const found = services.find((s) => s.id === id);
     if (found) {
       setServiceCode(found.nationalTaxCode);
-      if (found.municipalTaxCode) setMunicipalTaxCode(found.municipalTaxCode);
+      setMunicipalTaxCode(found.municipalTaxCode ?? '');
       setDescription(found.description);
       if (found.defaultIssRate) setIssRate(found.defaultIssRate);
       setIssWithheld(found.issWithheldDefault);
