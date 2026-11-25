@@ -109,30 +109,39 @@ export function CustomersPage({
     e.preventDefault();
     setError(null);
     try {
-      const payload = {
-        document,
-        name,
-        email: email || undefined,
-        phone: phone || undefined,
-        cityCode: cityCode || undefined,
-        zipCode: zipCode || undefined,
-        street: street || undefined,
-        number: number || undefined,
-        district: district || undefined,
-      };
       if (editingId) {
         await apiRequest(`/customers/${editingId}`, {
           method: 'PATCH',
           token,
           tenantId,
-          body: payload,
+          body: {
+            document: document.trim(),
+            name: name.trim(),
+            email: email.trim(),
+            phone: phone.trim(),
+            cityCode: cityCode.trim(),
+            zipCode: zipCode.trim(),
+            street: street.trim(),
+            number: number.trim(),
+            district: district.trim(),
+          },
         });
       } else {
         await apiRequest('/customers', {
           method: 'POST',
           token,
           tenantId,
-          body: payload,
+          body: {
+            document: document.trim(),
+            name: name.trim(),
+            email: email.trim() || undefined,
+            phone: phone.trim() || undefined,
+            cityCode: cityCode.trim() || undefined,
+            zipCode: zipCode.trim() || undefined,
+            street: street.trim() || undefined,
+            number: number.trim() || undefined,
+            district: district.trim() || undefined,
+          },
         });
       }
       setEditingId(null);

@@ -1,4 +1,12 @@
-import { IsEmail, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+  MinLength,
+  ValidateIf,
+} from 'class-validator';
 
 export class CreateCustomerDto {
   @IsString()
@@ -13,6 +21,7 @@ export class CreateCustomerDto {
   name: string;
 
   @IsOptional()
+  @ValidateIf((_, v) => v !== undefined && v !== null && v !== '')
   @IsEmail()
   email?: string;
 
@@ -42,6 +51,7 @@ export class CreateCustomerDto {
   district?: string;
 
   @IsOptional()
+  @ValidateIf((_, v) => v !== undefined && v !== null && v !== '')
   @IsString()
   @Matches(/^\d{7}$/)
   cityCode?: string;
@@ -62,6 +72,7 @@ export class UpdateCustomerDto {
   name?: string;
 
   @IsOptional()
+  @ValidateIf((_, v) => v !== undefined && v !== null && v !== '')
   @IsEmail()
   email?: string;
 
@@ -91,6 +102,7 @@ export class UpdateCustomerDto {
   district?: string;
 
   @IsOptional()
+  @ValidateIf((_, v) => v !== undefined && v !== null && v !== '')
   @IsString()
   @Matches(/^\d{7}$/)
   cityCode?: string;
