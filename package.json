@@ -1,0 +1,31 @@
+{
+  "name": "nfse-hub",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Plataforma SaaS Multiempresa de Gestão e Emissão de NFS-e (Contabilidade & Automação VPS)",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "services/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n API,WEB,WORKER -c cyan,yellow,magenta \"npm run dev:api\" \"npm run dev:web\" \"npm run dev:worker\"",
+    "dev:api": "npm run dev --workspace=@nfse-hub/api",
+    "dev:web": "npm run dev --workspace=@nfse-hub/web",
+    "dev:worker": "npm run dev --workspace=@nfse-hub/worker",
+    "build:base": "npm run build --workspace=@nfse-hub/nfse-types && npm run build --workspace=@nfse-hub/fiscal-core && npm run build --workspace=@nfse-hub/xml-engine && npm run build --workspace=@nfse-hub/municipality-registry && npm run build --workspace=@nfse-hub/national-sefin && npm run build --workspace=@nfse-hub/nota-control-df",
+    "build": "npm run build:base && npm run build --workspaces --if-present",
+    "typecheck": "npm run build:base && npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "prisma:generate": "npm run prisma:generate --workspace=@nfse-hub/api",
+    "prisma:migrate": "npm run prisma:migrate --workspace=@nfse-hub/api"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
+

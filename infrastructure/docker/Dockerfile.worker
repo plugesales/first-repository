@@ -1,0 +1,29 @@
+FROM node:22-alpine AS builder
+WORKDIR /app
+
+COPY package*.json tsconfig.base.json ./
+COPY packages ./packages
+COPY services ./services
+COPY apps/api/prisma ./apps/api/prisma
+
+RUN npm install --workspace=@nfse-hub/nfse-types --workspace=@nfse-hub/fiscal-core --workspace=@nfse-hub/xml-engine --workspace=@nfse-hub/municipality-registry --workspace=@nfse-hub/national-sefin --workspace=@nfse-hub/nota-control-df --workspace=@nfse-hub/worker
+RUN npm run build --workspace=@nfse-hub/nfse-types
+RUN npm run build --workspace=@nfse-hub/fiscal-core
+RUN npm run build --workspace=@nfse-hub/xml-engine
+RUN npm run build --workspace=@nfse-hub/municipality-registry
+RUN npm run build --workspace=@nfse-hub/national-sefin
+RUN npm run build --workspace=@nfse-hub/nota-control-df
+RUN npx prisma generate --schema=apps/api/prisma/schema.prisma
+RUN npm run build --workspace=@nfse-hub/worker
+
+FROM node:22-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages ./packages
+COPY --from=builder /app/services ./services
+COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
+
+CMD ["node", "services/worker/dist/index.js"]

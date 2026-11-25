@@ -1,0 +1,24 @@
+{
+  "name": "@nfse-hub/nota-control-df",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@nfse-hub/nfse-types": "0.1.0",
+    "@nfse-hub/xml-engine": "0.1.0",
+    "fast-xml-parser": "^4.5.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.10",
+    "@types/node-forge": "^1.3.11",
+    "node-forge": "^1.3.1",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.6"
+  }
+}

@@ -1,0 +1,412 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  TRIAL
+}
+
+enum TenantRole {
+  OWNER
+  ADMIN
+  ACCOUNTANT
+  OPERATOR
+  VIEWER
+}
+
+enum AuthProviderKind {
+  SUPABASE
+  LOCAL
+}
+
+enum CertificateType {
+  A1
+  A3
+}
+
+enum CertificateStatus {
+  ACTIVE
+  EXPIRING_SOON
+  EXPIRED
+  REVOKED
+  INVALID
+}
+
+enum Environment {
+  HOMOLOGATION
+  PRODUCTION
+}
+
+enum ProviderCode {
+  NATIONAL_SEFIN
+  NOTA_CONTROL_DF
+  ABRASF
+}
+
+enum InvoiceStatus {
+  DRAFT
+  QUEUED
+  PROCESSING
+  AUTHORIZED
+  REJECTED
+  CANCELLED
+  UNKNOWN
+}
+
+enum DpsStatus {
+  PENDING
+  SIGNED
+  SENT
+  CONVERTED
+  REJECTED
+  UNKNOWN
+}
+
+enum OutboxStatus {
+  PENDING
+  DISPATCHED
+  FAILED
+}
+
+model Tenant {
+  id        String       @id @default(uuid())
+  name      String
+  document  String?      @unique
+  plan      String       @default("starter")
+  status    TenantStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  memberships  UserTenant[]
+  companies    Company[]
+  certificates Certificate[]
+  customers    Customer[]
+  services     ServiceCatalog[]
+  dpsList      Dps[]
+  invoices     Invoice[]
+  events       InvoiceEvent[]
+  transmissions Transmission[]
+  outboxEvents OutboxEvent[]
+  auditLogs    AuditLog[]
+}
+
+model User {
+  id             String           @id @default(uuid())
+  email          String           @unique
+  name           String
+  externalAuthId String?          @unique
+  authProvider   AuthProviderKind @default(SUPABASE)
+  passwordHash   String?
+  isActive       Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  memberships UserTenant[]
+  auditLogs   AuditLog[]
+}
+
+model UserTenant {
+  id        String     @id @default(uuid())
+  userId    String
+  tenantId  String
+  role      TenantRole @default(OPERATOR)
+  isDefault Boolean    @default(false)
+  createdAt DateTime   @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId])
+  @@index([tenantId])
+}
+
+model Company {
+  id                  String      @id @default(uuid())
+  tenantId            String
+  legalName           String
+  tradeName           String?
+  document            String
+  municipalReg        String?
+  municipalityCode    String
+  taxRegime           String?
+  simplesNacionalOpt  Int?
+  environment         Environment @default(HOMOLOGATION)
+  defaultDpsSeries    String      @default("1")
+  isActive            Boolean     @default(true)
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  certificates  Certificate[]
+  dpsSequences  DpsSequence[]
+  services      ServiceCatalog[]
+  dpsList       Dps[]
+  invoices      Invoice[]
+  transmissions Transmission[]
+
+  @@unique([tenantId, document])
+  @@index([tenantId])
+  @@index([municipalityCode])
+}
+
+model Certificate {
+  id                String            @id @default(uuid())
+  tenantId          String
+  companyId         String
+  type              CertificateType   @default(A1)
+  subjectName       String
+  subjectDocument   String
+  issuerName        String
+  serialNumber      String
+  fingerprint       String
+  validFrom         DateTime
+  expiresAt         DateTime
+  status            CertificateStatus @default(ACTIVE)
+  isActive          Boolean           @default(true)
+  // Cofre criptografado no PostgreSQL (AES-256-GCM)
+  encryptedPfx      Bytes
+  pfxIv             String
+  pfxAuthTag        String
+  encryptedPassword String
+  passwordIv        String
+  passwordAuthTag   String
+  keyVersion        Int               @default(1)
+  lastValidatedAt   DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, fingerprint])
+  @@index([tenantId, companyId, isActive])
+  @@index([expiresAt])
+}
+
+model DpsSequence {
+  id         String   @id @default(uuid())
+  companyId  String
+  series     String
+  lastNumber BigInt   @default(0)
+  updatedAt  DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, series])
+}
+
+model Municipality {
+  ibgeCode          String       @id
+  name              String
+  state             String       @db.VarChar(2)
+  providerCode      ProviderCode
+  authorizationMode String
+  layoutVersion     String       @default("1.01")
+  homologationUrl   String?
+  productionUrl     String?
+  environment       Environment  @default(HOMOLOGATION)
+  active            Boolean      @default(false)
+  updatedAt         DateTime     @updatedAt
+
+  taxParameters TaxParameter[]
+}
+
+model Customer {
+  id        String   @id @default(uuid())
+  tenantId  String
+  document  String
+  name      String
+  email     String?
+  phone     String?
+  zipCode   String?
+  street    String?
+  number    String?
+  district  String?
+  cityCode  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoices Invoice[]
+
+  @@unique([tenantId, document])
+  @@index([tenantId])
+}
+
+model ServiceCatalog {
+  id                  String   @id @default(uuid())
+  tenantId            String
+  companyId           String
+  internalCode        String?
+  nationalTaxCode     String
+  municipalTaxCode    String
+  nbsCode             String?
+  description         String
+  defaultIssRate      Decimal? @db.Decimal(5, 2)
+  issWithheldDefault  Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, companyId])
+}
+
+model TaxParameter {
+  id               String    @id @default(uuid())
+  municipalityCode String
+  serviceCode      String
+  version          Int       @default(1)
+  validFrom        DateTime
+  validUntil       DateTime?
+  issRate          Decimal?  @db.Decimal(5, 2)
+  rulesPayload     Json
+  createdAt        DateTime  @default(now())
+
+  municipality Municipality @relation(fields: [municipalityCode], references: [ibgeCode], onDelete: Cascade)
+
+  @@unique([municipalityCode, serviceCode, version])
+  @@index([municipalityCode, serviceCode, validFrom])
+}
+
+model Dps {
+  id         String    @id @default(uuid())
+  tenantId   String
+  companyId  String
+  series     String
+  number     BigInt
+  dpsKey     String    @unique
+  status     DpsStatus @default(PENDING)
+  rawXml     String?
+  signedXml  String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoices Invoice[]
+
+  @@unique([companyId, series, number])
+  @@index([tenantId, companyId])
+}
+
+model Invoice {
+  id              String        @id @default(uuid())
+  tenantId        String
+  companyId       String
+  customerId      String?
+  dpsId           String?
+  idempotencyKey  String
+  providerCode    ProviderCode
+  environment     Environment   @default(HOMOLOGATION)
+  status          InvoiceStatus @default(DRAFT)
+  dpsSeries       String?
+  dpsNumber       BigInt?
+  accessKey       String?
+  invoiceNumber   String?
+  competenceDate  DateTime
+  amount          Decimal       @db.Decimal(15, 2)
+  netAmount       Decimal?      @db.Decimal(15, 2)
+  payload         Json
+  authorizedXml   String?
+  lastErrorCode   String?
+  lastErrorMsg    String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer      Customer?      @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  dps           Dps?           @relation(fields: [dpsId], references: [id], onDelete: SetNull)
+  events        InvoiceEvent[]
+  transmissions Transmission[]
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, companyId, status])
+  @@index([accessKey])
+}
+
+model InvoiceEvent {
+  id         String   @id @default(uuid())
+  tenantId   String
+  invoiceId  String
+  eventType  String
+  protocol   String?
+  status     String
+  requestXml String?
+  responseXml String?
+  createdAt  DateTime @default(now())
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, invoiceId])
+}
+
+model Transmission {
+  id             String       @id @default(uuid())
+  tenantId       String
+  companyId      String
+  invoiceId      String?
+  providerCode   ProviderCode
+  operation      String
+  endpoint       String
+  protocol       String?
+  httpStatus     Int?
+  attempt        Int          @default(1)
+  requestDigest  String?
+  responseSummary String?
+  createdAt      DateTime     @default(now())
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoice Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, companyId, createdAt])
+}
+
+model OutboxEvent {
+  id          String       @id @default(uuid())
+  tenantId    String
+  aggregate   String
+  aggregateId String
+  eventType   String
+  payload     Json
+  status      OutboxStatus @default(PENDING)
+  attempts    Int          @default(0)
+  lastError   String?
+  createdAt   DateTime     @default(now())
+  processedAt DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([tenantId])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  tenantId   String
+  userId     String?
+  action     String
+  resource   String
+  resourceId String?
+  metadata   Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([resource, resourceId])
+}
+

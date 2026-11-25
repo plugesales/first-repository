@@ -1,0 +1,26 @@
+# Dependências e builds
+node_modules/
+dist/
+build/
+.turbo/
+
+# Variáveis de ambiente e segredos locais
+.env
+.env.local
+.env.*.local
+
+# Certificados digitais e arquivos sensíveis (NUNCA versionar)
+Certificados/
+*.pfx
+*.p12
+*.pem
+*.key
+*.crt
+
+# Logs e arquivos temporários
+logs/
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
