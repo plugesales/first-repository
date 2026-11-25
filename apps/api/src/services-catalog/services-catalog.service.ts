@@ -2,7 +2,10 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import type { AuthenticatedPrincipal } from '@nfse-hub/nfse-types';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
-import type { CreateServiceCatalogDto } from './dto/service-catalog.dto';
+import type {
+  CreateServiceCatalogDto,
+  UpdateServiceCatalogDto,
+} from './dto/service-catalog.dto';
 
 @Injectable()
 export class ServicesCatalogService {
@@ -29,7 +32,7 @@ export class ServicesCatalogService {
         companyId: company.id,
         internalCode: dto.internalCode?.trim(),
         nationalTaxCode: dto.nationalTaxCode.replace(/\D/g, ''),
-        municipalTaxCode: dto.municipalTaxCode.trim(),
+        municipalTaxCode: dto.municipalTaxCode?.trim() ?? '',
         nbsCode: dto.nbsCode?.replace(/\D/g, ''),
         description: dto.description.trim(),
         defaultIssRate: dto.defaultIssRate,
@@ -61,6 +64,86 @@ export class ServicesCatalogService {
       },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async update(
+    principal: AuthenticatedPrincipal,
+    id: string,
+    dto: UpdateServiceCatalogDto,
+    ipAddress?: string,
+  ) {
+    const existing = await this.prisma.serviceCatalog.findFirst({
+      where: { id, tenantId: principal.tenantId },
+    });
+    if (!existing) {
+      throw new NotFoundException('Serviço não encontrado no catálogo.');
+    }
+
+    const updated = await this.prisma.serviceCatalog.update({
+      where: { id },
+      data: {
+        ...(dto.companyId ? { companyId: dto.companyId } : {}),
+        ...(dto.internalCode !== undefined
+          ? { internalCode: dto.internalCode.trim() || null }
+          : {}),
+        ...(dto.nationalTaxCode !== undefined
+          ? { nationalTaxCode: dto.nationalTaxCode.replace(/\D/g, '') }
+          : {}),
+        ...(dto.municipalTaxCode !== undefined
+          ? { municipalTaxCode: dto.municipalTaxCode.trim() }
+          : {}),
+        ...(dto.nbsCode !== undefined
+          ? { nbsCode: dto.nbsCode.replace(/\D/g, '') || null }
+          : {}),
+        ...(dto.description !== undefined
+          ? { description: dto.description.trim() }
+          : {}),
+        ...(dto.defaultIssRate !== undefined
+          ? { defaultIssRate: dto.defaultIssRate }
+          : {}),
+        ...(dto.issWithheldDefault !== undefined
+          ? { issWithheldDefault: dto.issWithheldDefault }
+          : {}),
+      },
+    });
+
+    await this.audit.record({
+      tenantId: principal.tenantId,
+      userId: principal.userId,
+      action: 'SERVICE_CATALOG_UPDATED',
+      resource: 'ServiceCatalog',
+      resourceId: id,
+      metadata: { nationalTaxCode: updated.nationalTaxCode },
+      ipAddress,
+    });
+
+    return updated;
+  }
+
+  async remove(
+    principal: AuthenticatedPrincipal,
+    id: string,
+    ipAddress?: string,
+  ) {
+    const existing = await this.prisma.serviceCatalog.findFirst({
+      where: { id, tenantId: principal.tenantId },
+    });
+    if (!existing) {
+      throw new NotFoundException('Serviço não encontrado no catálogo.');
+    }
+
+    await this.prisma.serviceCatalog.delete({ where: { id } });
+
+    await this.audit.record({
+      tenantId: principal.tenantId,
+      userId: principal.userId,
+      action: 'SERVICE_CATALOG_DELETED',
+      resource: 'ServiceCatalog',
+      resourceId: id,
+      ipAddress,
+    });
+
+    return { deleted: true, id };
   }
 }
 

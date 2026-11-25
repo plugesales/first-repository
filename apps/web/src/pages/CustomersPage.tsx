@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Plus, Users } from 'lucide-react';
+import { Pencil, Plus, Trash2, Users } from 'lucide-react';
 import { apiRequest } from '../lib/api';
 
 export interface CustomerSummary {
@@ -26,10 +26,12 @@ export function CustomersPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const [document, setDocument] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [cityCode, setCityCode] = useState('');
   const [zipCode, setZipCode] = useState('');
   const [street, setStreet] = useState('');
@@ -58,28 +60,86 @@ export function CustomersPage({
     void load();
   }, [load]);
 
-  async function handleCreate(e: FormEvent) {
+  function openNewForm() {
+    setEditingId(null);
+    setDocument('');
+    setName('');
+    setEmail('');
+    setPhone('');
+    setCityCode('');
+    setZipCode('');
+    setStreet('');
+    setNumber('');
+    setDistrict('');
+    setShowForm(true);
+  }
+
+  function startEdit(c: CustomerSummary) {
+    setEditingId(c.id);
+    setDocument(c.document);
+    setName(c.name);
+    setEmail(c.email ?? '');
+    setPhone(c.phone ?? '');
+    setCityCode(c.cityCode ?? '');
+    setZipCode(c.zipCode ?? '');
+    setStreet(c.street ?? '');
+    setNumber(c.number ?? '');
+    setDistrict(c.district ?? '');
+    setShowForm(true);
+  }
+
+  async function handleDelete(c: CustomerSummary) {
+    if (!window.confirm(`Excluir o tomador "${c.name}"?`)) return;
+    setError(null);
+    try {
+      await apiRequest(`/customers/${c.id}`, {
+        method: 'DELETE',
+        token,
+        tenantId,
+      });
+      await load();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Erro ao excluir cliente.',
+      );
+    }
+  }
+
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     try {
-      await apiRequest('/customers', {
-        method: 'POST',
-        token,
-        tenantId,
-        body: {
-          document,
-          name,
-          email: email || undefined,
-          cityCode: cityCode || undefined,
-          zipCode: zipCode || undefined,
-          street: street || undefined,
-          number: number || undefined,
-          district: district || undefined,
-        },
-      });
+      const payload = {
+        document,
+        name,
+        email: email || undefined,
+        phone: phone || undefined,
+        cityCode: cityCode || undefined,
+        zipCode: zipCode || undefined,
+        street: street || undefined,
+        number: number || undefined,
+        district: district || undefined,
+      };
+      if (editingId) {
+        await apiRequest(`/customers/${editingId}`, {
+          method: 'PATCH',
+          token,
+          tenantId,
+          body: payload,
+        });
+      } else {
+        await apiRequest('/customers', {
+          method: 'POST',
+          token,
+          tenantId,
+          body: payload,
+        });
+      }
+      setEditingId(null);
       setDocument('');
       setName('');
       setEmail('');
+      setPhone('');
       setCityCode('');
       setZipCode('');
       setStreet('');
@@ -89,7 +149,7 @@ export function CustomersPage({
       await load();
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : 'Erro ao cadastrar cliente.',
+        err instanceof Error ? err.message : 'Erro ao salvar cliente.',
       );
     }
   }
@@ -108,7 +168,7 @@ export function CustomersPage({
         </div>
         <button
           type="button"
-          onClick={() => setShowForm((v) => !v)}
+          onClick={() => (showForm && !editingId ? setShowForm(false) : openNewForm())}
           className="inline-flex items-center gap-2 rounded-lg bg-[#F76415] hover:bg-[#e5590d] px-4 py-2 text-sm font-medium text-white"
         >
           <Plus className="h-4 w-4" />
@@ -124,9 +184,14 @@ export function CustomersPage({
 
       {showForm && (
         <form
-          onSubmit={handleCreate}
+          onSubmit={handleSubmit}
           className="rounded-xl border border-[#2A2D35] bg-[#1D1F24] p-5 grid grid-cols-1 md:grid-cols-2 gap-4"
         >
+          <div className="md:col-span-2 flex items-center justify-between border-b border-[#2A2D35] pb-2">
+            <span className="text-sm font-medium text-white">
+              {editingId ? 'Editar Tomador' : 'Novo Tomador'}
+            </span>
+          </div>
           <label className="text-xs text-zinc-300">
             Nome / Razão Social *
             <input
@@ -225,16 +290,42 @@ export function CustomersPage({
           {customers.map((c) => (
             <div
               key={c.id}
-              className="rounded-xl border border-[#2A2D35] bg-[#1D1F24] p-4 flex items-center gap-3"
+              className="rounded-xl border border-[#2A2D35] bg-[#1D1F24] p-4 flex items-center justify-between gap-3"
             >
-              <Users className="h-5 w-5 text-[#F76415] shrink-0" />
-              <div className="min-w-0">
-                <p className="font-medium text-sm text-white truncate">
-                  {c.name}
-                </p>
-                <p className="text-xs text-zinc-400">
-                  Doc: {c.document} {c.email ? `· ${c.email}` : ''}
-                </p>
+              <div className="flex items-center gap-3 min-w-0">
+                <Users className="h-5 w-5 text-[#F76415] shrink-0" />
+                <div className="min-w-0">
+                  <p className="font-medium text-sm text-white truncate">
+                    {c.name}
+                  </p>
+                  <p className="text-xs text-zinc-400 truncate">
+                    Doc: {c.document} {c.email ? `· ${c.email}` : ''}
+                  </p>
+                  {(c.cityCode || c.street) && (
+                    <p className="text-[11px] text-zinc-500 truncate">
+                      {c.street ? `${c.street}${c.number ? `, ${c.number}` : ''} · ` : ''}
+                      {c.cityCode ? `IBGE ${c.cityCode}` : ''}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => startEdit(c)}
+                  className="inline-flex items-center gap-1 rounded-lg border border-[#2A2D35] hover:border-[#F76415]/60 px-2.5 py-1.5 text-xs text-zinc-200"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  <span>Editar</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleDelete(c)}
+                  className="inline-flex items-center rounded-lg border border-[#2A2D35] hover:border-red-500/60 px-2 py-1.5 text-xs text-red-400"
+                  title="Excluir tomador"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
               </div>
             </div>
           ))}
