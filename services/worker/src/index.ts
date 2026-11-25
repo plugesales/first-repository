@@ -12,6 +12,7 @@ import { Queue, Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import { loadWorkerEnv } from './config/worker-env';
 import { CertificateMonitorJob } from './jobs/certificate-monitor.job';
+import { DirectOutboxRunner } from './jobs/direct-outbox-runner';
 import { OutboxRelayJob } from './jobs/outbox-relay.job';
 import {
   NfseEmissionProcessor,
@@ -27,13 +28,6 @@ export const NFSE_EMISSION_QUEUE = 'nfse-emission';
 export async function bootstrapWorker(): Promise<void> {
   const env = loadWorkerEnv();
   const prisma = new PrismaClient();
-
-  const redis = new IORedis({
-    host: env.REDIS_HOST,
-    port: env.REDIS_PORT,
-    password: env.REDIS_PASSWORD || undefined,
-    maxRetriesPerRequest: null,
-  });
 
   const vault = new WorkerCertificateVault(
     {
@@ -226,9 +220,51 @@ export async function bootstrapWorker(): Promise<void> {
   };
 
   const processor = new NfseEmissionProcessor(store, vault, registry);
+  const certMonitor = new CertificateMonitorJob(prisma);
+
+  if (env.WORKER_MODE === 'direct') {
+    const directRunner = new DirectOutboxRunner(prisma, processor);
+    const directTimer = setInterval(() => {
+      void directRunner.pollOnce().catch((err) => {
+        console.error('[nfse-hub/worker] Erro no DirectOutboxRunner:', err);
+      });
+    }, env.OUTBOX_POLL_INTERVAL_MS);
+
+    const monitorTimer = setInterval(() => {
+      void certMonitor.run().catch((err) => {
+        console.error('[nfse-hub/worker] Erro no CertificateMonitor:', err);
+      });
+    }, env.CERT_MONITOR_INTERVAL_MS);
+
+    void directRunner.pollOnce().catch((err) => {
+      console.error('[nfse-hub/worker] Erro no DirectOutboxRunner inicial:', err);
+    });
+
+    console.info(
+      `[nfse-hub/worker] Online em "${env.APP_ENV}" (modo direct, sem Redis) com conectores NATIONAL_SEFIN e NOTA_CONTROL_DF ativos.`,
+    );
+
+    const shutdownDirect = async () => {
+      clearInterval(directTimer);
+      clearInterval(monitorTimer);
+      await prisma.$disconnect();
+      process.exit(0);
+    };
+
+    process.on('SIGINT', () => void shutdownDirect());
+    process.on('SIGTERM', () => void shutdownDirect());
+    return;
+  }
+
+  const redis = new IORedis({
+    host: env.REDIS_HOST,
+    port: env.REDIS_PORT,
+    password: env.REDIS_PASSWORD || undefined,
+    maxRetriesPerRequest: null,
+  });
+
   const emissionQueue = new Queue(NFSE_EMISSION_QUEUE, { connection: redis });
   const outboxRelay = new OutboxRelayJob(prisma, emissionQueue);
-  const certMonitor = new CertificateMonitorJob(prisma);
 
   const worker = new Worker<EmissionJobPayload | CancelJobPayload>(
     NFSE_EMISSION_QUEUE,
