@@ -6,14 +6,13 @@ import type {
   ProviderRuntimeDeps,
 } from '@nfse-hub/nfse-types';
 import { NotaControlDfProvider } from '@nfse-hub/nota-control-df';
+import { NodeMtlsTransport } from '@nfse-hub/xml-engine';
 import { Prisma, PrismaClient } from '@prisma/client';
 import { Queue, Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import { loadWorkerEnv } from './config/worker-env';
 import { CertificateMonitorJob } from './jobs/certificate-monitor.job';
-import { DirectOutboxRunner } from './jobs/direct-outbox-runner';
 import { OutboxRelayJob } from './jobs/outbox-relay.job';
-import { MtlsHttpClient } from './mtls/mtls-http-client';
 import {
   NfseEmissionProcessor,
   type CancelJobPayload,
@@ -28,6 +27,13 @@ export const NFSE_EMISSION_QUEUE = 'nfse-emission';
 export async function bootstrapWorker(): Promise<void> {
   const env = loadWorkerEnv();
   const prisma = new PrismaClient();
+
+  const redis = new IORedis({
+    host: env.REDIS_HOST,
+    port: env.REDIS_PORT,
+    password: env.REDIS_PASSWORD || undefined,
+    maxRetriesPerRequest: null,
+  });
 
   const vault = new WorkerCertificateVault(
     {
@@ -49,25 +55,36 @@ export async function bootstrapWorker(): Promise<void> {
   );
 
   const sequenceService = new DpsSequenceService(prisma);
-  const mtlsTransport = new MtlsHttpClient();
+  const mtlsTransport = new NodeMtlsTransport();
 
   const runtimeDeps: ProviderRuntimeDeps = {
     mtlsTransport,
     getCertificate: async (companyId) => {
-      const company = await prisma.company.findUniqueOrThrow({
+      const company = await prisma.company.findUnique({
         where: { id: companyId },
         select: { tenantId: true },
       });
+      if (!company) {
+        throw new Error(`Empresa ${companyId} não encontrada.`);
+      }
       return vault.getActiveMaterial(company.tenantId, companyId);
     },
     getCompanyContext: async (companyId) => {
-      const company = await prisma.company.findUniqueOrThrow({
+      const company = await prisma.company.findUnique({
         where: { id: companyId },
       });
+      if (!company) {
+        throw new Error(`Empresa ${companyId} não encontrada.`);
+      }
       const municipality = await prisma.municipality.findUnique({
         where: { ibgeCode: company.municipalityCode },
       });
-      const envType = company.environment;
+
+      const endpointUrl =
+        company.environment === 'PRODUCTION'
+          ? municipality?.productionUrl ?? undefined
+          : municipality?.homologationUrl ?? undefined;
+
       return {
         companyId: company.id,
         tenantId: company.tenantId,
@@ -75,12 +92,9 @@ export async function bootstrapWorker(): Promise<void> {
         municipalReg: company.municipalReg ?? '',
         municipalityCode: company.municipalityCode,
         simplesNacionalOpt: company.simplesNacionalOpt ?? 1,
-        environment: envType,
+        environment: company.environment,
         dpsSeries: company.defaultDpsSeries,
-        endpointUrl:
-          envType === 'PRODUCTION'
-            ? (municipality?.productionUrl ?? undefined)
-            : (municipality?.homologationUrl ?? undefined),
+        endpointUrl,
         layoutVersion:
           municipality?.layoutVersion === '1.00' ? '1.00' : '1.01',
       };
@@ -96,6 +110,7 @@ export async function bootstrapWorker(): Promise<void> {
       supportsCheck: async (ibgeCode) => {
         const mun = await prisma.municipality.findUnique({
           where: { ibgeCode },
+          select: { providerCode: true, active: true },
         });
         return Boolean(mun?.active && mun.providerCode === 'NATIONAL_SEFIN');
       },
@@ -107,6 +122,7 @@ export async function bootstrapWorker(): Promise<void> {
       supportsCheck: async (ibgeCode) => {
         const mun = await prisma.municipality.findUnique({
           where: { ibgeCode },
+          select: { providerCode: true, active: true },
         });
         return Boolean(mun?.active && mun.providerCode === 'NOTA_CONTROL_DF');
       },
@@ -210,46 +226,9 @@ export async function bootstrapWorker(): Promise<void> {
   };
 
   const processor = new NfseEmissionProcessor(store, vault, registry);
-  const certMonitor = new CertificateMonitorJob(prisma);
-
-  const monitorTimer = setInterval(() => {
-    void certMonitor.run().catch((err) => {
-      console.error('[nfse-hub/worker] Erro no CertificateMonitor:', err);
-    });
-  }, env.CERT_MONITOR_INTERVAL_MS);
-
-  if (env.WORKER_MODE === 'direct') {
-    const directRunner = new DirectOutboxRunner(prisma, processor);
-    const directTimer = setInterval(() => {
-      void directRunner.pollOnce().catch((err) => {
-        console.error('[nfse-hub/worker] Erro no DirectOutboxRunner:', err);
-      });
-    }, env.OUTBOX_POLL_INTERVAL_MS);
-
-    console.info(
-      `[nfse-hub/worker] Online em "${env.APP_ENV}" (modo DIRECT sem Redis). Conectores SEFIN Nacional e NotaControl DF ativos.`,
-    );
-
-    const shutdownDirect = async () => {
-      clearInterval(directTimer);
-      clearInterval(monitorTimer);
-      await prisma.$disconnect();
-      process.exit(0);
-    };
-    process.on('SIGINT', () => void shutdownDirect());
-    process.on('SIGTERM', () => void shutdownDirect());
-    return;
-  }
-
-  const redis = new IORedis({
-    host: env.REDIS_HOST,
-    port: env.REDIS_PORT,
-    password: env.REDIS_PASSWORD || undefined,
-    maxRetriesPerRequest: null,
-  });
-
   const emissionQueue = new Queue(NFSE_EMISSION_QUEUE, { connection: redis });
   const outboxRelay = new OutboxRelayJob(prisma, emissionQueue);
+  const certMonitor = new CertificateMonitorJob(prisma);
 
   const worker = new Worker<EmissionJobPayload | CancelJobPayload>(
     NFSE_EMISSION_QUEUE,
@@ -274,8 +253,14 @@ export async function bootstrapWorker(): Promise<void> {
     });
   }, env.OUTBOX_POLL_INTERVAL_MS);
 
+  const monitorTimer = setInterval(() => {
+    void certMonitor.run().catch((err) => {
+      console.error('[nfse-hub/worker] Erro no CertificateMonitor:', err);
+    });
+  }, env.CERT_MONITOR_INTERVAL_MS);
+
   console.info(
-    `[nfse-hub/worker] Online em "${env.APP_ENV}" (modo BullMQ + Redis). Conectores SEFIN Nacional e NotaControl DF plugados na fila "${NFSE_EMISSION_QUEUE}".`,
+    `[nfse-hub/worker] Online em "${env.APP_ENV}" com conectores NATIONAL_SEFIN e NOTA_CONTROL_DF ativos.`,
   );
 
   const shutdown = async () => {
@@ -298,7 +283,6 @@ if (require.main === module) {
 
 export * from './config/worker-env';
 export * from './jobs/certificate-monitor.job';
-export * from './jobs/direct-outbox-runner';
 export * from './jobs/outbox-relay.job';
 export * from './mtls/mtls-http-client';
 export * from './processors/nfse-emission.processor';

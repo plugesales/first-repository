@@ -102,7 +102,9 @@ export class NationalSefinProvider implements NfseProvider {
       dpsNumber,
       issuedAtUtc: formatNfseDateTime(),
       layoutVersion: context.layoutVersion ?? '1.01',
-      finNFSe: '0',
+      // Produção Restrita (Homologação) já exige <finNFSe> (NT 009 / Reforma Tributária),
+      // enquanto Produção oficial ainda utiliza o XSD sem <finNFSe>.
+      finNFSe: context.environment === 'HOMOLOGATION' ? '0' : undefined,
       provider: {
         document: context.document,
         municipalReg: context.municipalReg,
