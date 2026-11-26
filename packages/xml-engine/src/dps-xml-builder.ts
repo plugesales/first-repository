@@ -43,7 +43,9 @@ export function buildDpsId(params: {
   const docDigits = params.providerDocument.replace(/\D/g, '');
   const docType = docDigits.length === 14 ? '2' : '1';
   const paddedDoc = docDigits.padStart(14, '0').slice(0, 14);
-  const paddedSeries = String(params.series).replace(/\D/g, '').padStart(5, '0').slice(0, 5);
+  const rawSeries = String(params.series).replace(/\D/g, '');
+  const numericSeries = rawSeries ? String(Number(rawSeries)) : '1';
+  const paddedSeries = numericSeries.padStart(5, '0').slice(0, 5);
   const paddedNumber = String(params.number).replace(/\D/g, '').padStart(15, '0').slice(0, 15);
 
   return `DPS${mun}${docType}${paddedDoc}${paddedSeries}${paddedNumber}`;
@@ -103,6 +105,9 @@ export function buildDpsXml(input: DpsBuildInput): {
   const cleanNbs = input.emission.nbsCode?.replace(/\D/g, '').slice(0, 9) ?? '';
   const ibscbs = input.ibscbs ?? input.emission.ibscbs;
 
+  const rawSeries = String(input.dpsSeries).replace(/\D/g, '');
+  const numericSeries = rawSeries ? String(Number(rawSeries)) : '1';
+
   const parts: string[] = [
     `<?xml version="1.0" encoding="UTF-8"?>`,
     `<DPS versao="${version}" xmlns="${NFSE_NAMESPACE}">`,
@@ -110,7 +115,7 @@ export function buildDpsXml(input: DpsBuildInput): {
     `<tpAmb>${tpAmb}</tpAmb>`,
     `<dhEmi>${escapeXml(input.issuedAtUtc)}</dhEmi>`,
     `<verAplic>${escapeXml(input.appVersion.slice(0, 20))}</verAplic>`,
-    `<serie>${Number(input.dpsSeries)}</serie>`,
+    `<serie>${numericSeries}</serie>`,
     `<nDPS>${String(input.dpsNumber)}</nDPS>`,
     `<dCompet>${escapeXml(input.emission.competenceDate.slice(0, 10))}</dCompet>`,
     `<tpEmit>1</tpEmit>`,

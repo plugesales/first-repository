@@ -114,7 +114,13 @@ export class NotaControlDfProvider implements NfseProvider {
         simplesNacionalOpt: context.simplesNacionalOpt,
         specialTaxRegime: context.specialTaxRegime,
       },
-      emission: input,
+      emission: {
+        ...input,
+        // Manual ISS/DF v1.01 exige <cTribMun> (1-1) dentro de <cServ>.
+        municipalTaxCode:
+          input.municipalTaxCode?.trim() ||
+          input.serviceCode.replace(/\D/g, '').slice(0, 6),
+      },
     });
 
     const signedDps = this.signer.signXml({
