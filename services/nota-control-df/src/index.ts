@@ -116,10 +116,8 @@ export class NotaControlDfProvider implements NfseProvider {
       },
       emission: {
         ...input,
-        // Manual ISS/DF v1.01 exige <cTribMun> (1-1) dentro de <cServ>.
-        municipalTaxCode:
-          input.municipalTaxCode?.trim() ||
-          input.serviceCode.replace(/\D/g, '').slice(0, 6),
+        // Manual ISS/DF v1.01 exige <cTribMun> (1-1) dentro de <cServ>; notas recentes no ISS/DF usam "0" quando não há código municipal específico.
+        municipalTaxCode: input.municipalTaxCode?.trim() || '0',
       },
     });
 
