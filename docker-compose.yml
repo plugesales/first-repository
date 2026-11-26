@@ -75,6 +75,10 @@ services:
     build:
       context: .
       dockerfile: infrastructure/docker/Dockerfile.web
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api/v1}
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-}
     restart: unless-stopped
     depends_on:
       - api
