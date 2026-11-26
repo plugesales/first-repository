@@ -25,7 +25,8 @@ async function main() {
       layoutVersion: '1.01',
       homologationUrl:
         'https://nfse.issnetonline.com.br/wsnfsenacional/homologacao/nfse.asmx',
-      productionUrl: null,
+      productionUrl:
+        'https://nfse.fazenda.df.gov.br/wsnfsenacional/nfse.asmx',
       environment: 'HOMOLOGATION' as const,
       active: true,
     },

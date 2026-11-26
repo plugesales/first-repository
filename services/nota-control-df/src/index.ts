@@ -340,6 +340,8 @@ export class NotaControlDfProvider implements NfseProvider {
 
     const innerXml = this.extractSoapResultXml(soapBody, resultTagName);
     if (!innerXml) {
+      const preview = soapBody.replace(/\s+/g, ' ').trim().slice(0, 400);
+      console.error(`[NOTA_CONTROL_DF] INVALID_SOAP_RESPONSE (HTTP ${statusCode}): ${preview}`);
       return {
         status: 'unknown',
         provider: this.providerCode,
@@ -347,7 +349,7 @@ export class NotaControlDfProvider implements NfseProvider {
         errors: [
           {
             code: 'INVALID_SOAP_RESPONSE',
-            message: 'Resposta SOAP não contém o nó de resultado esperado.',
+            message: `Resposta SOAP não contém o nó de resultado esperado (HTTP ${statusCode}): ${preview}`,
           },
         ],
       };
