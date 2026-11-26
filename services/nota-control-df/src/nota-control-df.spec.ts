@@ -93,7 +93,8 @@ describe('NotaControlDfProvider (Manual v1.01 SOAP)', () => {
     expect(captured[0].headers?.SOAPAction).toBe(
       'http://www.sped.fazenda.gov.br/nfse/GerarNfse',
     );
-    expect(String(captured[0].body)).toContain('versaoDados&gt;1.01');
+    expect(String(captured[0].body)).toContain('<versaoDados>1.01</versaoDados>');
+    expect(String(captured[0].body)).toContain('<IBSCBS>');
   });
 
   it('interpreta ListaMensagemRetorno em caso de rejeição fiscal', async () => {

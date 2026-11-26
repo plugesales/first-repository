@@ -93,12 +93,24 @@ export class InvoicesService {
         }
       : undefined);
 
+    const catalogNbs = !dto.nbsCode
+      ? await this.prisma.serviceCatalog.findFirst({
+          where: {
+            tenantId: principal.tenantId,
+            companyId: company.id,
+            nationalTaxCode: dto.serviceCode,
+          },
+          select: { nbsCode: true },
+        })
+      : null;
+
     const emissionPayload: NfseEmissionInput = {
       companyId: company.id,
       customerId: dto.customerId,
       municipalityCode: dto.municipalityCode,
       serviceCode: dto.serviceCode,
       municipalTaxCode: dto.municipalTaxCode?.trim() || undefined,
+      nbsCode: dto.nbsCode?.trim() || catalogNbs?.nbsCode?.trim() || undefined,
       competenceDate: dto.competenceDate,
       customer: {
         ...dto.customer,
@@ -272,6 +284,8 @@ export class InvoicesService {
       : 5;
     const municipalTaxCode =
       dto.municipalTaxCode ?? serviceCatalogItem?.municipalTaxCode ?? undefined;
+    const nbsCode =
+      dto.nbsCode ?? serviceCatalogItem?.nbsCode ?? undefined;
 
     const now = new Date();
     const localToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -286,6 +300,7 @@ export class InvoicesService {
       municipalityCode: company.municipalityCode,
       serviceCode,
       municipalTaxCode,
+      nbsCode,
       competenceDate,
       customer: {
         document: cleanCustDoc,

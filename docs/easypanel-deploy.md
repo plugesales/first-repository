@@ -99,3 +99,4 @@ curl -X POST https://nfse.seudominio.com/api/v1/webhooks/issue \
   -H "x-api-key: sua_chave_secreta_para_o_n8n" \
   -d '{"customer":{"document":"56950767000136","name":"VIP SOLUCOES LTDA"},"amount":1.00,"description":"TESTE PRODUCAO CLOUD"}'
 ```
+

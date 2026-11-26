@@ -1,4 +1,8 @@
-import type { FiscalEnvironment, NfseEmissionInput } from '@nfse-hub/nfse-types';
+import type {
+  FiscalEnvironment,
+  NfseEmissionInput,
+  NfseIbsCbsInput,
+} from '@nfse-hub/nfse-types';
 
 export type LayoutVersion = '1.00' | '1.01';
 
@@ -21,6 +25,8 @@ export interface DpsBuildInput {
   layoutVersion?: LayoutVersion;
   /** Finalidade da NFS-e em <infDPS> (exigida na NT 009 / SEFIN Nacional v1.01: 0 = regular). */
   finNFSe?: '0' | '1' | '2';
+  /** Grupo IBSCBS (obrigatório na v1.01 do ISS/DF para competência >= 01/10/2026). */
+  ibscbs?: NfseIbsCbsInput;
 }
 
 /**
@@ -94,6 +100,8 @@ export function buildDpsXml(input: DpsBuildInput): {
   const descIncond = input.emission.service.unconditionalDiscount;
   const descCond = input.emission.service.conditionalDiscount;
   const tpRetISSQN = input.emission.service.issWithheld ? '2' : '1';
+  const cleanNbs = input.emission.nbsCode?.replace(/\D/g, '').slice(0, 9) ?? '';
+  const ibscbs = input.ibscbs ?? input.emission.ibscbs;
 
   const parts: string[] = [
     `<?xml version="1.0" encoding="UTF-8"?>`,
@@ -146,6 +154,7 @@ export function buildDpsXml(input: DpsBuildInput): {
       ? [`<cTribMun>${escapeXml(input.emission.municipalTaxCode.trim().slice(0, 20))}</cTribMun>`]
       : []),
     `<xDescServ>${escapeXml(input.emission.service.description.trim().slice(0, 2000))}</xDescServ>`,
+    ...(cleanNbs ? [`<cNBS>${escapeXml(cleanNbs)}</cNBS>`] : []),
     `</cServ>`,
     `</serv>`,
     `<valores>`,
@@ -173,6 +182,19 @@ export function buildDpsXml(input: DpsBuildInput): {
       : [`<totTrib><indTotTrib>0</indTotTrib></totTrib>`]),
     `</trib>`,
     `</valores>`,
+    ...(ibscbs
+      ? [
+          `<IBSCBS>` +
+            `<finNFSe>${escapeXml(ibscbs.finNFSe ?? '0')}</finNFSe>` +
+            `<cIndOp>${escapeXml(ibscbs.cIndOp ?? '100301')}</cIndOp>` +
+            `<indDest>${escapeXml(ibscbs.indDest ?? '0')}</indDest>` +
+            `<valores><trib><gIBSCBS>` +
+            `<CST>${escapeXml(ibscbs.cst ?? '000')}</CST>` +
+            `<cClassTrib>${escapeXml(ibscbs.cClassTrib ?? '000001')}</cClassTrib>` +
+            `</gIBSCBS></trib></valores>` +
+            `</IBSCBS>`,
+        ]
+      : []),
     `</infDPS>`,
     `</DPS>`,
   ];

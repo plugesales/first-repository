@@ -14,12 +14,22 @@ export type ProviderCode =
   | 'NOTA_CONTROL_DF'
   | 'ABRASF';
 
+export interface NfseIbsCbsInput {
+  finNFSe?: string;
+  cIndOp?: string;
+  indDest?: string;
+  cst?: string;
+  cClassTrib?: string;
+}
+
 export interface NfseEmissionInput {
   companyId: string;
   customerId?: string;
   municipalityCode: string;
   serviceCode: string;
   municipalTaxCode?: string;
+  nbsCode?: string;
+  ibscbs?: NfseIbsCbsInput;
   competenceDate: string;
   customer: {
     document: string;

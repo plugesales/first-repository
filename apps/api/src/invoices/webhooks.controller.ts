@@ -30,3 +30,4 @@ export class WebhooksController {
     return this.invoicesService.quickIssue(principal, dto, req.ip);
   }
 }
+

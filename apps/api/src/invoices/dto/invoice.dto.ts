@@ -115,6 +115,11 @@ export class CreateInvoiceDto {
   @MaxLength(20)
   municipalTaxCode?: string;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  nbsCode?: string;
+
   @IsDateString()
   competenceDate: string;
 
@@ -174,6 +179,10 @@ export class QuickIssueDto {
   @IsOptional()
   @IsString()
   municipalTaxCode?: string;
+
+  @IsOptional()
+  @IsString()
+  nbsCode?: string;
 
   @IsOptional()
   @IsDateString()

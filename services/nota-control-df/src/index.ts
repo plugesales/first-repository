@@ -97,6 +97,8 @@ export class NotaControlDfProvider implements NfseProvider {
     );
 
     const layoutVersion = context.layoutVersion ?? '1.01';
+    const requiresIbsCbs =
+      layoutVersion === '1.01' && input.competenceDate.slice(0, 10) >= '2026-10-01';
     const built = buildDpsXml({
       environment: context.environment,
       appVersion: this.appVersion,
@@ -104,6 +106,7 @@ export class NotaControlDfProvider implements NfseProvider {
       dpsNumber,
       issuedAtUtc: formatNfseDateTime(),
       layoutVersion,
+      ibscbs: input.ibscbs ?? (requiresIbsCbs ? {} : undefined),
       provider: {
         document: context.document,
         municipalReg: context.municipalReg,
@@ -138,7 +141,8 @@ export class NotaControlDfProvider implements NfseProvider {
       };
     }
 
-    const dadosMsg = `<GerarNfseEnvio xmlns="${NFSE_NAMESPACE}">${signedDps}</GerarNfseEnvio>`;
+    const signedDpsBody = signedDps.replace(/^<\?xml[^?]*\?>\s*/i, '');
+    const dadosMsg = `<GerarNfseEnvio xmlns="${NFSE_NAMESPACE}">${signedDpsBody}</GerarNfseEnvio>`;
 
     const res = await this.sendSoap({
       endpointUrl: this.resolveEndpoint(context.endpointUrl, context.environment),
@@ -281,6 +285,7 @@ export class NotaControlDfProvider implements NfseProvider {
   }) {
     const deps = this.requireDeps();
     const cabecXml = buildSoapHeaderXml(params.layoutVersion);
+    const cleanDadosXml = params.dadosXml.replace(/^<\?xml[^?]*\?>\s*/i, '');
 
     const envelope = [
       `<?xml version="1.0" encoding="utf-8"?>`,
@@ -288,8 +293,8 @@ export class NotaControlDfProvider implements NfseProvider {
       `<soapenv:Header/>`,
       `<soapenv:Body>`,
       `<nfse:${params.method}>`,
-      `<nfse:nfseCabecMsg>${escapeXml(cabecXml)}</nfse:nfseCabecMsg>`,
-      `<nfse:nfseDadosMsg>${escapeXml(params.dadosXml)}</nfse:nfseDadosMsg>`,
+      `<nfse:nfseCabecMsg>${cabecXml}</nfse:nfseCabecMsg>`,
+      `<nfse:nfseDadosMsg>${cleanDadosXml}</nfse:nfseDadosMsg>`,
       `</nfse:${params.method}>`,
       `</soapenv:Body>`,
       `</soapenv:Envelope>`,
