@@ -26,6 +26,7 @@ export function ServicesPage({
   const [companyId, setCompanyId] = useState('');
   const [nationalTaxCode, setNationalTaxCode] = useState('170601');
   const [municipalTaxCode, setMunicipalTaxCode] = useState('');
+  const [nbsCode, setNbsCode] = useState('1.1406.12.00');
   const [description, setDescription] = useState('');
   const [defaultIssRate, setDefaultIssRate] = useState('5.00');
   const [issWithheldDefault, setIssWithheldDefault] = useState(false);
@@ -60,6 +61,7 @@ export function ServicesPage({
     setEditingId(null);
     setNationalTaxCode('170601');
     setMunicipalTaxCode('');
+    setNbsCode('1.1406.12.00');
     setDescription('');
     setDefaultIssRate('5.00');
     setIssWithheldDefault(false);
@@ -71,6 +73,7 @@ export function ServicesPage({
     setCompanyId(s.companyId);
     setNationalTaxCode(s.nationalTaxCode);
     setMunicipalTaxCode(s.municipalTaxCode ?? '');
+    setNbsCode(s.nbsCode ?? '');
     setDescription(s.description);
     setDefaultIssRate(s.defaultIssRate ?? '5.00');
     setIssWithheldDefault(s.issWithheldDefault);
@@ -102,6 +105,7 @@ export function ServicesPage({
         companyId,
         nationalTaxCode,
         municipalTaxCode: municipalTaxCode.trim(),
+        nbsCode: nbsCode.trim(),
         description,
         defaultIssRate: defaultIssRate ? Number(defaultIssRate) : undefined,
         issWithheldDefault,
@@ -201,6 +205,15 @@ export function ServicesPage({
               value={municipalTaxCode}
               onChange={(e) => setMunicipalTaxCode(e.target.value)}
               placeholder="Deixe vazio se não aplicável"
+              className="mt-1 w-full rounded-lg bg-[#141518] border border-[#2A2D35] px-3 py-2 text-sm text-white"
+            />
+          </label>
+          <label className="text-xs text-zinc-300">
+            Código NBS (obrigatório p/ IBS/CBS no DF)
+            <input
+              value={nbsCode}
+              onChange={(e) => setNbsCode(e.target.value)}
+              placeholder="Ex.: 1.1406.12.00"
               className="mt-1 w-full rounded-lg bg-[#141518] border border-[#2A2D35] px-3 py-2 text-sm text-white"
             />
           </label>
