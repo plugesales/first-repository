@@ -10,6 +10,7 @@ export interface CompanySummary {
   municipalReg: string | null;
   municipalityCode: string;
   simplesNacionalOpt: number | null;
+  defaultDpsSeries?: string;
   environment: 'HOMOLOGATION' | 'PRODUCTION';
   activeCertificate: {
     id: string;
@@ -43,6 +44,7 @@ export function CompaniesPage({ token, tenantId }: CompaniesPageProps) {
   const [municipalReg, setMunicipalReg] = useState('');
   const [municipalityCode, setMunicipalityCode] = useState('5300108');
   const [simplesNacionalOpt, setSimplesNacionalOpt] = useState<string>('1');
+  const [defaultDpsSeries, setDefaultDpsSeries] = useState<string>('3');
   const [environment, setEnvironment] = useState<'HOMOLOGATION' | 'PRODUCTION'>(
     'HOMOLOGATION',
   );
@@ -76,6 +78,7 @@ export function CompaniesPage({ token, tenantId }: CompaniesPageProps) {
     setMunicipalReg('');
     setMunicipalityCode('5300108');
     setSimplesNacionalOpt('1');
+    setDefaultDpsSeries('3');
     setEnvironment('HOMOLOGATION');
     setShowForm(true);
   }
@@ -87,6 +90,7 @@ export function CompaniesPage({ token, tenantId }: CompaniesPageProps) {
     setMunicipalReg(company.municipalReg ?? '');
     setMunicipalityCode(company.municipalityCode);
     setSimplesNacionalOpt(String(company.simplesNacionalOpt ?? 1));
+    setDefaultDpsSeries(company.defaultDpsSeries ?? '3');
     setEnvironment(company.environment);
     setShowForm(true);
   }
@@ -105,6 +109,7 @@ export function CompaniesPage({ token, tenantId }: CompaniesPageProps) {
             municipalReg: municipalReg.trim(),
             municipalityCode,
             simplesNacionalOpt: Number(simplesNacionalOpt),
+            defaultDpsSeries: defaultDpsSeries.trim() || '3',
             environment,
           },
         });
@@ -119,6 +124,7 @@ export function CompaniesPage({ token, tenantId }: CompaniesPageProps) {
             municipalReg: municipalReg.trim() || undefined,
             municipalityCode,
             simplesNacionalOpt: Number(simplesNacionalOpt),
+            defaultDpsSeries: defaultDpsSeries.trim() || '3',
             environment,
           },
         });
@@ -208,6 +214,15 @@ export function CompaniesPage({ token, tenantId }: CompaniesPageProps) {
               pattern="\d{7}"
               value={municipalityCode}
               onChange={(e) => setMunicipalityCode(e.target.value)}
+            className="mt-1 w-full rounded-lg bg-[#141518] border border-[#2A2D35] px-3 py-2 text-sm text-white focus:outline-none focus:border-[#F76415]"
+            />
+          </label>
+          <label className="text-xs text-zinc-300">
+            Série DPS Padrão
+            <input
+              value={defaultDpsSeries}
+              onChange={(e) => setDefaultDpsSeries(e.target.value)}
+              placeholder="Ex.: 3"
               className="mt-1 w-full rounded-lg bg-[#141518] border border-[#2A2D35] px-3 py-2 text-sm text-white focus:outline-none focus:border-[#F76415]"
             />
           </label>

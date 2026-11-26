@@ -53,7 +53,7 @@ export class CompaniesService {
         taxRegime: dto.taxRegime?.trim(),
         simplesNacionalOpt: dto.simplesNacionalOpt,
         environment: dto.environment ?? 'HOMOLOGATION',
-        defaultDpsSeries: dto.defaultDpsSeries?.trim() || '1',
+        defaultDpsSeries: dto.defaultDpsSeries?.trim() || '3',
       },
     });
 
