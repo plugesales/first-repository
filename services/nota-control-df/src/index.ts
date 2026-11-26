@@ -374,8 +374,12 @@ export class NotaControlDfProvider implements NfseProvider {
     const compNfse = (listaNfse?.CompNfse ?? nestedRoot?.CompNfse ?? root?.CompNfse) as
       | Record<string, unknown>
       | undefined;
-    const nfse = (compNfse?.Nfse ?? compNfse) as Record<string, unknown> | undefined;
-    const infNfse = (nfse?.InfNfse ?? nfse) as Record<string, unknown> | undefined;
+    const nfse = (compNfse?.NFSe ?? compNfse?.Nfse ?? compNfse) as
+      | Record<string, unknown>
+      | undefined;
+    const infNfse = (nfse?.infNFSe ?? nfse?.InfNfse ?? nfse) as
+      | Record<string, unknown>
+      | undefined;
 
     const accessKey =
       typeof infNfse?.['@_Id'] === 'string'
@@ -412,13 +416,14 @@ export class NotaControlDfProvider implements NfseProvider {
 
     // 2. Tenta extrair a tag diretamente via regex para evitar perdas de formatação do SOAP XML
     const tagBase = resultTagName.replace(/Result$/, '');
-    const regexPattern = new RegExp(
-      `<(?:(?:\\w+:)?(?:${resultTagName}|${tagBase}Resposta|${tagBase}Response))[^>]*>([\\s\\S]*?)<\\/(?:(?:\\w+:)?(?:${resultTagName}|${tagBase}Resposta|${tagBase}Response))>`,
-      'i',
+    const innerMatch = cleanSoap.match(
+      new RegExp(
+        `<(?:\\w+:)?(${resultTagName}|${tagBase}Resposta)\\b[^>]*>([\\s\\S]*?)<\\/(?:\\w+:)?\\1>`,
+        'i',
+      ),
     );
-    const match = cleanSoap.match(regexPattern);
-    if (match) {
-      let content = match[1] || match[0];
+    if (innerMatch) {
+      let content = innerMatch[2] || innerMatch[0];
       if (content.includes('&lt;') && content.includes('&gt;')) {
         content = content
           .replace(/&lt;/g, '<')
@@ -426,8 +431,11 @@ export class NotaControlDfProvider implements NfseProvider {
           .replace(/&amp;/g, '&')
           .replace(/&quot;/g, '"')
           .replace(/&apos;/g, "'");
+        return content;
       }
-      return content;
+      return innerMatch[1].toLowerCase().endsWith('resposta')
+        ? innerMatch[0]
+        : content;
     }
 
     const parsed = this.xmlParser.parse(cleanSoap) as Record<string, unknown>;
