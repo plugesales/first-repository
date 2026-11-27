@@ -287,8 +287,8 @@ export class InvoicesService {
     const nbsCode =
       dto.nbsCode ?? serviceCatalogItem?.nbsCode ?? undefined;
 
-    const now = new Date();
-    const localToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const brasiliaNow = new Date(Date.now() - 3 * 60 * 60 * 1000);
+    const localToday = brasiliaNow.toISOString().slice(0, 10);
     const competenceDate = dto.competenceDate || localToday;
     const idempotencyKey =
       dto.idempotencyKey ||
